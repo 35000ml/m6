@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>クラスの平均身長・体重計算プログラム</title>
+    <style>
+        body {
+            font-family: 'Meiryo', Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1, h2 {
+            color: #333;
+            text-align: center;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, button {
+            padding: 8px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .result {
+            font-weight: bold;
+            font-size: 1.1em;
+            margin: 10px 0;
+        }
+        .error {
+            color: red;
+            margin: 5px 0;
+        }
+        .hidden {
+            display: none;
+        }
+        #studentInputs {
+            border-top: 1px solid #ddd;
+            padding-top: 15px;
+            margin-top: 15px;
+        }
+        .current-student {
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 15px;
+            color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <h1>クラスの平均身長・体重計算プログラム</h1>
+    
+    <div class="container" id="initialSetup">
+        <h2>初期設定</h2>
+        <div class="form-group">
+            <label for="classSize">クラスの人数 (1～99):</label>
+            <input type="number" id="classSize" min="1" max="99">
+            <div id="classSizeError" class="error"></div>
+        </div>
+        <button id="startButton">入力開始</button>
+    </div>
+    
+    <div class="container hidden" id="studentInputs">
+        <h2>生徒データ入力</h2>
+        <div class="current-student" id="currentStudentText">生徒 1 / <span id="totalStudents">0</span></div>
+        
+        <div class="form-group">
+            <label for="studentId">出席番号 (1～99):</label>
+            <input type="number" id="studentId" min="1" max="99">
+            <div id="studentIdError" class="error"></div>
+        </div>
+        
+        <div class="form-group">
+            <label for="studentName">名前 (1～20文字):</label>
+            <input type="text" id="studentName" maxlength="20">
+            <div id="studentNameError" class="error"></div>
+        </div>
+        
+        <div class="form-group">
+            <label for="studentHeight">身長 (cm, 1～300):</label>
+            <input type="number" id="studentHeight" min="1" max="300" step="0.1">
+            <div id="studentHeightError" class="error"></div>
+        </div>
+        
+        <div class="form-group">
+            <label for="studentWeight">体重 (kg, 1～300):</label>
+            <input type="number" id="studentWeight" min="1" max="300" step="0.1">
+            <div id="studentWeightError" class="error"></div>
+        </div>
+        
+        <button id="nextStudentButton">次の生徒</button>
+    </div>
+    
+    <div class="container hidden" id="resultsContainer">
+        <h2>入力データと計算結果</h2>
+        
+        <h3>入力されたデータ一覧</h3>
+        <table id="studentsTable">
+            <thead>
+                <tr>
+                    <th>出席番号</th>
+                    <th>名前</th>
+                    <th>身長 (cm)</th>
+                    <th>体重 (kg)</th>
+                </tr>
+            </thead>
+            <tbody id="studentsTableBody">
+                <!-- 動的に生成されるデータの行 -->
+            </tbody>
+        </table>
+        
+        <h3>クラスの平均値</h3>
+        <div class="result" id="avgHeightResult">平均身長: - cm</div>
+        <div class="result" id="avgWeightResult">平均体重: - kg</div>
+        
+        <h3>身長・体重の範囲</h3>
+        <div class="result" id="heightRangeResult">身長範囲: - cm ～ - cm</div>
+        <div class="result" id="weightRangeResult">体重範囲: - kg ～ - kg</div>
+        
+        <button id="resetButton">最初から入力しなおす</button>
+    </div>
+    
+    <script>
+        // グローバル変数
+        let classSize = 0;
+        let currentStudentIndex = 0;
+        let students = [];
+        let usedIds = new Set();
+        
+        // 要素の取得
+        const initialSetupDiv = document.getElementById('initialSetup');
+        const studentInputsDiv = document.getElementById('studentInputs');
+        const resultsContainerDiv = document.getElementById('resultsContainer');
+        const startButton = document.getElementById('startButton');
+        const nextStudentButton = document.getElementById('nextStudentButton');
+        const resetButton = document.getElementById('resetButton');
+        
+        // 最初のステップ: クラスサイズ設定とバリデーション
+        startButton.addEventListener('click', function() {
+            const classSizeInput = document.getElementById('classSize');
+            const classSizeError = document.getElementById('classSizeError');
+            
+            classSize = parseInt(classSizeInput.value);
+            
+            if (isNaN(classSize) || classSize < 1 || classSize > 99) {
+                classSizeError.textContent = 'クラスの人数は1～99の範囲で入力してください。';
+                return;
+            }
+            
+            // クラスサイズが正しい場合、初期化して次のステップへ
+            classSizeError.textContent = '';
+            students = [];
+            usedIds = new Set();
+            currentStudentIndex = 0;
+            
+            // 表示を更新
+            document.getElementById('totalStudents').textContent = classSize;
+            document.getElementById('currentStudentText').textContent = `生徒 1 / ${classSize}`;
+            
+            // 入力フィールドをクリア
+            clearStudentInputs();
+            
+            // 次の画面に進む
+            initialSetupDiv.classList.add('hidden');
+            studentInputsDiv.classList.remove('hidden');
+        });
+        
+        // 次の生徒ボタンの処理
+        nextStudentButton.addEventListener('click', function() {
+            if (validateAndSaveCurrentStudent()) {
+                currentStudentIndex++;
+                
+                // すべての生徒の入力が完了したか確認
+                if (currentStudentIndex >= classSize) {
+                    showResults();
+                } else {
+                    // 次の生徒の入力へ
+                    document.getElementById('currentStudentText').textContent = `生徒 ${currentStudentIndex + 1} / ${classSize}`;
+                    clearStudentInputs();
+                }
+            }
+        });
+        
+        // リセットボタンの処理
+        resetButton.addEventListener('click', function() {
+            // 状態を初期化
+            classSize = 0;
+            currentStudentIndex = 0;
+            students = [];
+            usedIds = new Set();
+            
+            // 表示をリセット
+            clearStudentInputs();
+            document.getElementById('classSize').value = '';
+            document.getElementById('classSizeError').textContent = '';
+            
+            // 最初の画面に戻る
+            resultsContainerDiv.classList.add('hidden');
+            studentInputsDiv.classList.add('hidden');
+            initialSetupDiv.classList.remove('hidden');
+        });
+        
+        // 現在の生徒のデータを検証して保存
+        function validateAndSaveCurrentStudent() {
+            const studentIdInput = document.getElementById('studentId');
+            const studentNameInput = document.getElementById('studentName');
+            const studentHeightInput = document.getElementById('studentHeight');
+            const studentWeightInput = document.getElementById('studentWeight');
+            
+            const studentIdError = document.getElementById('studentIdError');
+            const studentNameError = document.getElementById('studentNameError');
+            const studentHeightError = document.getElementById('studentHeightError');
+            const studentWeightError = document.getElementById('studentWeightError');
+            
+            // 全てのエラーメッセージをクリア
+            studentIdError.textContent = '';
+            studentNameError.textContent = '';
+            studentHeightError.textContent = '';
+            studentWeightError.textContent = '';
+            
+            let isValid = true;
+            
+            // 出席番号のバリデーション
+            const studentId = parseInt(studentIdInput.value);
+            if (isNaN(studentId) || studentId < 1 || studentId > 99) {
+                studentIdError.textContent = '出席番号は1～99の範囲で入力してください。';
+                isValid = false;
+            } else if (usedIds.has(studentId)) {
+                studentIdError.textContent = 'この出席番号は既に使用されています。';
+                isValid = false;
+            }
+            
+            // 名前のバリデーション
+            const studentName = studentNameInput.value.trim();
+            if (studentName.length < 1 || studentName.length > 20) {
+                studentNameError.textContent = '名前は1～20文字で入力してください。';
+                isValid = false;
+            }
+            
+            // 身長のバリデーション
+            const studentHeight = parseFloat(studentHeightInput.value);
+            if (isNaN(studentHeight) || studentHeight < 1 || studentHeight > 300) {
+                studentHeightError.textContent = '身長は1～300の範囲で入力してください。';
+                isValid = false;
+            }
+            
+            // 体重のバリデーション
+            const studentWeight = parseFloat(studentWeightInput.value);
+            if (isNaN(studentWeight) || studentWeight < 1 || studentWeight > 300) {
+                studentWeightError.textContent = '体重は1～300の範囲で入力してください。';
+                isValid = false;
+            }
+            
+            // すべてのバリデーションに合格した場合
+            if (isValid) {
+                // 新しい生徒データをリストに追加
+                students.push({
+                    id: studentId,
+                    name: studentName,
+                    height: studentHeight,
+                    weight: studentWeight
+                });
+                
+                // 使用済みIDに追加
+                usedIds.add(studentId);
+            }
+            
+            return isValid;
+        }
+        
+        // 生徒入力フィールドをクリア
+        function clearStudentInputs() {
+            document.getElementById('studentId').value = '';
+            document.getElementById('studentName').value = '';
+            document.getElementById('studentHeight').value = '';
+            document.getElementById('studentWeight').value = '';
+            
+            document.getElementById('studentIdError').textContent = '';
+            document.getElementById('studentNameError').textContent = '';
+            document.getElementById('studentHeightError').textContent = '';
+            document.getElementById('studentWeightError').textContent = '';
+        }
+        
+        // 結果を表示
+        function showResults() {
+            // 入力画面を隠して結果画面を表示
+            studentInputsDiv.classList.add('hidden');
+            resultsContainerDiv.classList.remove('hidden');
+            
+            // 生徒データテーブルを生成
+            generateStudentsTable();
+            
+            // 統計を計算して表示
+            calculateAndDisplayStatistics();
+        }
+        
+        // 生徒データをテーブルに表示
+        function generateStudentsTable() {
+            const tableBody = document.getElementById('studentsTableBody');
+            tableBody.innerHTML = '';
+            
+            // 出席番号順にソート
+            students.sort((a, b) => a.id - b.id);
+            
+            // 各生徒の行を作成
+            students.forEach(student => {
+                const row = document.createElement('tr');
+                
+                const idCell = document.createElement('td');
+                idCell.textContent = student.id;
+                row.appendChild(idCell);
+                
+                const nameCell = document.createElement('td');
+                nameCell.textContent = student.name;
+                row.appendChild(nameCell);
+                
+                const heightCell = document.createElement('td');
+                heightCell.textContent = student.height.toFixed(1);
+                row.appendChild(heightCell);
+                
+                const weightCell = document.createElement('td');
+                weightCell.textContent = student.weight.toFixed(1);
+                row.appendChild(weightCell);
+                
+                tableBody.appendChild(row);
+            });
+        }
+        
+        // 統計を計算して表示
+        function calculateAndDisplayStatistics() {
+            // 平均の計算
+            const sumHeight = students.reduce((sum, student) => sum + student.height, 0);
+            const sumWeight = students.reduce((sum, student) => sum + student.weight, 0);
+            
+            const avgHeight = sumHeight / students.length;
+            const avgWeight = sumWeight / students.length;
+            
+            // 最小・最大値の取得
+            const heights = students.map(student => student.height);
+            const weights = students.map(student => student.weight);
+            
+            const minHeight = Math.min(...heights);
+            const maxHeight = Math.max(...heights);
+            const minWeight = Math.min(...weights);
+            const maxWeight = Math.max(...weights);
+            
+            // 結果の表示
+            document.getElementById('avgHeightResult').textContent = `平均身長: ${avgHeight.toFixed(1)} cm`;
+            document.getElementById('avgWeightResult').textContent = `平均体重: ${avgWeight.toFixed(1)} kg`;
+            
+            document.getElementById('heightRangeResult').textContent = `身長範囲: ${minHeight.toFixed(1)} cm ～ ${maxHeight.toFixed(1)} cm`;
+            document.getElementById('weightRangeResult').textContent = `体重範囲: ${minWeight.toFixed(1)} kg ～ ${maxWeight.toFixed(1)} kg`;
+        }
+    </script>
+</body>
+</html>
